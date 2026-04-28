@@ -4,44 +4,48 @@ import numpy as np
 import plotly.express as px
 from datetime import datetime, timedelta
 import random
+import os
 
-# --- НАСТРОЙКИ СТРАНИЦЫ И СТИЛИ ---
+# --- НАСТРОЙКИ СТРАНИЦЫ ---
 st.set_page_config(page_title="AI Аналитика Ремонтов", layout="wide", initial_sidebar_state="collapsed")
 
-# Кастомный CSS для решения проблемы с темной темой и красивого отображения
+# --- СТИЛИЗАЦИЯ (Фикс темной темы и закругления) ---
 st.markdown("""
     <style>
-    /* Делаем текст на плашках (expander) темно-синим при любой теме */
+    /* Настройка плашек колонн */
     div[data-testid="stExpander"] {
-        background-color: #f0f2f6 !important;
+        background-color: #ffffff !important;
         border-radius: 15px !important;
-        border: 1px solid #d1d5db;
-        transition: all 0.3s ease;
+        border: 1px solid #3b82f6 !important;
+        margin-bottom: 10px;
     }
+    /* Текст внутри плашек (названия колонн) */
     div[data-testid="stExpander"] p, div[data-testid="stExpander"] span {
-        color: #1e3a8a !important; /* Темно-синий цвет шрифта */
-        font-weight: 600;
+        color: #003366 !important; 
+        font-weight: bold !important;
+        font-size: 1.1rem;
     }
-    div[data-testid="stExpander"]:hover {
-        border-color: #3b82f6;
-        box-shadow: 0 4px 10px rgba(255,255,255,0.1);
-    }
+    /* Кнопки механиков */
     .stButton>button {
-        border-radius: 10px;
-        width: 100%;
-        transition: all 0.2s;
-        color: #ffffff !important; /* Белый текст на кнопках механиков */
-        background-color: #2563eb !important; /* Синие кнопки */
+        border-radius: 12px;
+        background-color: #3b82f6 !important;
+        color: white !important;
         border: none;
+        padding: 10px 20px;
+        transition: all 0.3s;
     }
     .stButton>button:hover {
-        transform: scale(1.02);
         background-color: #1d4ed8 !important;
+        transform: translateY(-2px);
+    }
+    /* Заголовки */
+    h1, h2, h3 {
+        color: #3b82f6 !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- СТРУКТУРА КОМПАНИИ ---
+# --- ДАННЫЕ КОМПАНИИ ---
 FLEET_STRUCTURE = {
     "Колонна 1": ["Ахметнянов Руслан Равилевич", "Сергиевский Антон Сергеевич"],
     "Колонна 2": ["Галиев Анас Рашитович"],
@@ -51,159 +55,109 @@ FLEET_STRUCTURE = {
     "Колонна Перемещение": ["Назаров Андрей Михайлович"]
 }
 
-# --- ГЕНЕРАЦИЯ ДАННЫХ (осталась прежней) ---
+# --- ГЕНЕРАЦИЯ ДАННЫХ (Симуляция) ---
 @st.cache_data
-def generate_mechanic_data(mechanic_name):
+def get_data(mechanic_name):
     np.random.seed(hash(mechanic_name) % 2**32)
-    num_cars = np.random.randint(8, 15)
-    data = []
-    for _ in range(num_cars):
-        truck_plate = f"{random.choice(['А','В','Е','К','М','Н','О','Р','С','Т','У','Х'])}{random.randint(100,999)}{random.choice(['АА','ВВ','ЕЕ','КК','ММ'])}{random.choice(['77','777','799','116','163'])}"
-        trailer_plate = f"{random.choice(['АА','ВВ','ЕЕ','КК'])}{random.randint(1000,9999)}{random.choice(['77','777','116'])}"
-        mileage = random.randint(100000, 800000)
-        brakes = random.randint(50000, 400000)
-        suspension = random.randint(30000, 250000)
-        engine = random.randint(10000, 300000)
-        electric = random.randint(5000, 80000)
-        trailer_repairs = random.randint(10000, 150000)
-        total_cost = brakes + suspension + engine + electric + trailer_repairs
-        cpk = round(total_cost / mileage, 2)
-        last_repair_date = datetime.now() - timedelta(days=random.randint(1, 45))
-        last_repair_cost = random.randint(15000, 120000)
-        last_repair_reasons = ["Замена тормозных дисков и колодок", "Ремонт форсунок ДВС", "Переборка суппортов", "Сайлентблоки полурессоры", "Замена датчика NOx", "Диагностика пневмосистемы"]
-        last_repair_desc = random.choice(last_repair_reasons)
-        data.append({
-            "Тягач (Гос. номер)": truck_plate,
-            "Прицеп (Гос. номер)": trailer_plate,
-            "Пробег": mileage, "Тормозная система": brakes, "Ходовая часть": suspension,
-            "ДВС и трансмиссия": engine, "Электрика": electric, "Ремонт прицепа": trailer_repairs,
-            "Итого затрат": total_cost, "Руб/Км (CPK)": cpk,
-            "Дата последнего ремонта": last_repair_date.strftime("%d.%m.%Y"),
-            "Стоимость посл. ремонта": last_repair_cost, "Суть посл. ремонта": last_repair_desc
+    cars = []
+    prefixes = ["A", "B", "E", "K", "M", "H", "O", "P", "C", "T"]
+    for i in range(random.randint(10, 15)):
+        truck_num = f"{random.choice(prefixes)}{random.randint(100,999)}{random.choice(prefixes)}{random.choice(prefixes)}116"
+        trailer_num = f"XP{random.randint(1000,9999)}16"
+        mileage = random.randint(150000, 600000)
+        brakes = random.randint(30000, 350000); suspension = random.randint(20000, 200000)
+        engine = random.randint(5000, 400000); electric = random.randint(2000, 50000)
+        total = brakes + suspension + engine + electric + random.randint(5000, 100000)
+        cpk = round(total / mileage, 2)
+        last_date = datetime.now() - timedelta(days=random.randint(1, 60))
+        cars.append({
+            "Госномер": truck_num, "Прицеп": trailer_num, "Пробег": mileage,
+            "Тормоза": brakes, "Ходовая": suspension, "ДВС": engine, "Электрика": electric,
+            "Итого": total, "Руб/Км": cpk, "Дата рем.": last_date.strftime("%d.%m.%Y"),
+            "Сумма рем.": random.randint(20000, 150000), "Что делали": random.choice(["Замена суппортов", "Ремонт ГБЦ", "Замена сайлентблоков", "Ремонт ПГУ", "Замена дисков/колодок"])
         })
-    df = pd.DataFrame(data)
-    df = df.sort_values(by="Руб/Км (CPK)", ascending=False).reset_index(drop=True)
-    return df
+    return pd.DataFrame(cars).sort_values("Руб/Км", ascending=False)
 
-# --- УПРАВЛЕНИЕ СОСТОЯНИЕМ ---
-if 'view' not in st.session_state: st.session_state.view = 'selection'
-if 'selected_mechanic' not in st.session_state: st.session_state.selected_mechanic = None
-if 'selected_column' not in st.session_state: st.session_state.selected_column = None
-
-def go_to_dashboard(mechanic, column):
-    st.session_state.selected_mechanic = mechanic
-    st.session_state.selected_column = column
-    st.session_state.view = 'dashboard'
-
-def go_to_selection():
-    st.session_state.view = 'selection'
-    st.session_state.selected_mechanic = None
+# --- ЛОГИКА ПЕРЕКЛЮЧЕНИЯ СТРАНИЦ ---
+if 'page' not in st.session_state: st.session_state.page = 'main'
+if 'mech' not in st.session_state: st.session_state.mech = None
+if 'col' not in st.session_state: st.session_state.col = None
 
 # =====================================================================
-# ЭКРАН 1: ВЫБОР КОЛОННЫ И МЕХАНИКА
+# ЭКРАН ВЫБОРА
 # =====================================================================
-if st.session_state.view == 'selection':
-    
-    # --- БЛОК ЗАГОЛОВКА И ЛОГОТИПА ---
-    header_col1, header_col2 = st.columns([5, 1]) # Разделяем экран 5 к 1
-    
-    with header_col1:
-        st.title("🏭 Выбор подразделения")
-        st.markdown("<p style='color: #888; font-size: 1.1rem;'>Выберите колонну и ответственного механика для анализа рентабельности ремонтов.</p>", unsafe_allow_html=True)
-        
-    with header_col2:
-        # ВНИМАНИЕ: Замени .png на правильное расширение, если у тебя картинка другая (например, .jpg)
-        logo_path = r"C:\Users\Danil\Desktop\logo\logo.png" 
-        try:
-            st.image(logo_path, use_container_width=True)
-        except Exception as e:
-            st.error("Логотип не найден по указанному пути.")
+if st.session_state.page == 'main':
+    h_col1, h_col2 = st.columns([5, 1])
+    with h_col1:
+        st.title("🚛 Выбор подразделения") # ЗАМЕНИЛ ИКОНКУ ЗАВОДА НА ФУРУ
+        st.write("Выберите колонну и ответственного механика для анализа рентабельности.")
+    with h_col2:
+        # Проверка наличия логотипа
+        if os.path.exists("logo.png"):
+            st.image("logo.png", use_container_width=True)
+        else:
+            st.caption("Логотип не найден")
 
     st.markdown("---")
     
-    # --- МЕНЮ ВЫБОРА ---
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        for column_name, mechanics in FLEET_STRUCTURE.items():
-            with st.expander(f"📁 {column_name}", expanded=False):
-                st.write("**Ответственные механики:**")
-                for mech in mechanics:
-                    if st.button(f"👤 {mech}", key=f"btn_{column_name}_{mech}"):
-                        go_to_dashboard(mech, column_name)
+    sc1, sc2, sc3 = st.columns([1, 2, 1])
+    with sc2:
+        for col_name, mechanics in FLEET_STRUCTURE.items():
+            with st.expander(f"📁 {col_name}"):
+                for m in mechanics:
+                    if st.button(f"👤 {m}", key=f"btn_{col_name}_{m}"):
+                        st.session_state.mech = m
+                        st.session_state.col = col_name
+                        st.session_state.page = 'dashboard'
                         st.rerun()
 
 # =====================================================================
-# ЭКРАН 2: ДАШБОРД (остался прежним, только добавил логотип на этот экран тоже)
+# ДАШБОРД
 # =====================================================================
-elif st.session_state.view == 'dashboard':
-    mechanic = st.session_state.selected_mechanic
-    column = st.session_state.selected_column
-    
-    header_col1, header_col2 = st.columns([5, 1])
-    with header_col1:
-        if st.button("⬅ Назад к выбору колонны"):
-            go_to_selection()
+else:
+    dh_col1, dh_col2, dh_col3 = st.columns([1, 4, 1])
+    with dh_col1:
+        if st.button("⬅ Назад"):
+            st.session_state.page = 'main'
             st.rerun()
-        st.title(f"🛠️ Аналитика ремонтов: {mechanic}")
-        st.caption(f"Подразделение: {column}")
-    with header_col2:
-        try:
-            st.image(r"C:\Users\Danil\Desktop\logo\logo.png", use_container_width=True)
-        except:
-            pass
-            
-    df = generate_mechanic_data(mechanic)
-    
-    # --- KPI БЛОК ДЛЯ РУКОВОДИТЕЛЯ ---
-    st.markdown("### 📊 Общая сводка (Executive Summary)")
-    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
-    kpi1.metric("Машин в парке", len(df))
-    kpi2.metric("Суммарные затраты", f"{df['Итого затрат'].sum():,.0f} ₽".replace(',', ' '))
-    kpi3.metric("Средний показатель руб/км", f"{df['Руб/Км (CPK)'].mean():.2f} ₽")
-    sum_costs = df[['Тормозная система', 'Ходовая часть', 'ДВС и трансмиссия', 'Электрика', 'Ремонт прицепа']].sum()
-    kpi4.metric("Главная статья расходов", sum_costs.idxmax())
-    st.markdown("---")
-    
-    # --- ТОП ПРОБЛЕМНЫХ АВТОМОБИЛЕЙ ---
-    st.markdown("### 🚨 Проблемные автомобили (Антирейтинг по стоимости 1 км пути)")
-    st.info("💡 ИИ-совет: Нормальный показатель CPK (затраты на ремонт / пробег) не должен превышать 1.5 - 2.0 руб/км. Машины в красной зоне работают в убыток или требуют капитального пересмотра логики обслуживания.")
-    
-    fig_bar = px.bar(
-        df.head(5), x="Тягач (Гос. номер)", y="Руб/Км (CPK)", color="Руб/Км (CPK)",
-        text="Итого затрат", color_continuous_scale="Reds"
-    )
-    fig_bar.update_traces(texttemplate='%{text:,.0f} ₽', textposition='outside')
-    st.plotly_chart(fig_bar, use_container_width=True)
-    
-    # --- ДЕТАЛЬНЫЙ РАЗБОР КОНКРЕТНОЙ МАШИНЫ ---
-    st.markdown("### 🔍 Детальный аудит сцепки")
-    selected_truck = st.selectbox("Выберите сцепку для детального анализа:", df["Тягач (Гос. номер)"])
-    car_data = df[df["Тягач (Гос. номер)"] == selected_truck].iloc[0]
-    col_info, col_chart = st.columns([1, 1.2])
-    
-    with col_info:
-        st.markdown(f"#### Сцепка: `{car_data['Тягач (Гос. номер)']} / {car_data['Прицеп (Гос. номер)']}`")
-        st.write(f"**Пробег:** {car_data['Пробег']:,.0f} км".replace(',', ' '))
-        st.write(f"**Показатель:** `{car_data['Руб/Км (CPK)']} руб/км`")
-        st.markdown("##### 🕒 Последний визит в сервис:")
-        st.write(f"**Дата:** {car_data['Дата последнего ремонта']}")
-        st.write(f"**Стоимость:** {car_data['Стоимость посл. ремонта']:,.0f} ₽".replace(',', ' '))
-        st.write(f"**Работы:** *{car_data['Суть посл. ремонта']}*")
-        st.markdown("##### 🤖 Вывод AI-Аналитика:")
-        
-        if car_data['Тормозная система'] > car_data['Итого затрат'] * 0.4:
-            st.warning("**Диагноз:** Аномальные расходы на тормозную систему.\n\n**Меры:** Проверить ретардер, выгрузить лог вождения из телематики, проверить бренд колодок.")
-        elif car_data['Ремонт прицепа'] > car_data['Итого затрат'] * 0.3:
-            st.error("**Диагноз:** Перерасход бюджета на прицеп.\n\n**Меры:** Обязательная проверка геометрии осей (соосность), диагностика ABS/EBS прицепа.")
-        elif car_data['Руб/Км (CPK)'] > 2.5 and car_data['Пробег'] > 500000:
-            st.error(f"**Диагноз:** Автомобиль исчерпал ресурс (CPK = {car_data['Руб/Км (CPK)']}).\n\n**Меры:** Подготовить расчет TCO и сравнить с лизингом нового тягача.")
-        else:
-            st.success("**Диагноз:** Штатная эксплуатация.\n\n**Меры:** Плановое ТО. Обратить внимание на превентивную замену ремней навесного оборудования.")
+    with dh_col2:
+        st.title(f"Аналитика: {st.session_state.mech}")
+    with dh_col3:
+        if os.path.exists("logo.png"):
+            st.image("logo.png", width=100)
 
-    with col_chart:
-        costs = {"Тормоза": car_data["Тормозная система"], "Ходовая": car_data["Ходовая часть"], "ДВС/КПП": car_data["ДВС и трансмиссия"], "Электрика": car_data["Электрика"], "Прицеп": car_data["Ремонт прицепа"]}
-        pie_df = pd.DataFrame(list(costs.items()), columns=["Категория", "Сумма"])
-        fig_pie = px.pie(pie_df, values="Сумма", names="Категория", hole=0.5, color_discrete_sequence=px.colors.qualitative.Pastel)
-        fig_pie.update_traces(textposition='inside', textinfo='percent+label')
-        fig_pie.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)") 
+    df = get_data(st.session_state.mech)
+    
+    # Сводка
+    k1, k2, k3 = st.columns(3)
+    k1.metric("Машин в работе", len(df))
+    k2.metric("Общие затраты", f"{df['Итого'].sum():,.0f} ₽")
+    k3.metric("Средний Руб/Км", f"{df['Руб/Км'].mean():.2f}")
+
+    st.markdown("---")
+    st.subheader("⚠️ Проблемные авто (высокий Руб/Км)")
+    fig = px.bar(df.head(5), x="Госномер", y="Руб/Км", color="Руб/Км", color_continuous_scale="Reds")
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Аудит конкретной машины
+    st.markdown("---")
+    selected_car = st.selectbox("Выберите автомобиль для аудита:", df["Госномер"])
+    car = df[df["Госномер"] == selected_car].iloc[0]
+
+    det1, det2 = st.columns([1, 1])
+    with det1:
+        st.markdown(f"### Сцепка: `{car['Госномер']} / {car['Прицеп']}`")
+        st.write(f"**Пробег:** {car['Пробег']:,.0f} км")
+        st.write(f"**Показатель:** {car['Руб/Км']} руб/км")
+        st.info(f"**Последний ремонт ({car['Дата рем.']}):** {car['Что делали']} на {car['Сумма рем.']:,.0f} ₽")
+        
+        st.subheader("🤖 Вывод ИИ:")
+        if car["Руб/Км"] > 2.0:
+            st.error("Критический перерасход. Рекомендуется проверить качество запчастей тормозной системы и работу водителя.")
+        else:
+            st.success("Машина в норме. Текущие затраты соответствуют пробегу.")
+            
+    with det2:
+        costs = {"Тормоза": car["Тормоза"], "Ходовая": car["Ходовая"], "ДВС": car["ДВС"], "Электрика": car["Электрика"]}
+        fig_pie = px.pie(values=list(costs.values()), names=list(costs.keys()), hole=0.4, title="Куда ушли деньги")
         st.plotly_chart(fig_pie, use_container_width=True)
