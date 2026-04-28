@@ -79,7 +79,7 @@ def get_data(mechanic_name):
             
             events.append({
                 "Сцепка": car['combo'], "Госномер": car['truck'], "Марка": car['t_brand'], "Год_ТС": car['t_year'],
-                "Марка_Тягача": car['t_brand'], "Марка_Прицепа": car['tr_brand'], # Добавлено для удобного фильтра сцепки
+                "Марка_Тягача": car['t_brand'], "Марка_Прицепа": car['tr_brand'],
                 "Тип": "Тягач", "Дата": r_date, "Год": r_date.year, "Месяц": r_date.month,
                 "Тормоза": brakes, "Ходовая": suspension, "ДВС": engine, "Электрика": electric, "Прочее": other,
                 "Итого": total, "Пробег_период": mileage
@@ -174,7 +174,7 @@ else:
     df_filtered = df_raw[(df_raw['Год'] == selected_year) & (df_raw['Месяц'] >= start_m_idx) & (df_raw['Месяц'] <= end_m_idx)]
     
     # 3. Фильтры Марки и Года (зависят от выбранной категории)
-    st.markdown("#### 🏷️ Характеристики техники (оставьте пустым для выбора всех)")
+    st.markdown("#### 🏷️ Характеристики техники")
     filter_col1, filter_col2 = st.columns(2)
     
     if view_mode == "Тягач":
@@ -183,9 +183,9 @@ else:
         all_years = sorted(df_filtered['Год_ТС'].unique())
         
         with filter_col1:
-            sel_brands = st.multiselect("Марка тягача:", all_brands)
+            sel_brands = st.multiselect("Марка тягача:", all_brands, placeholder="Выбраны все (нажмите для фильтра)")
         with filter_col2:
-            sel_years = st.multiselect("Год выпуска:", all_years)
+            sel_years = st.multiselect("Год выпуска:", all_years, placeholder="Выбраны все (нажмите для фильтра)")
             
         if sel_brands: df_filtered = df_filtered[df_filtered['Марка'].isin(sel_brands)]
         if sel_years:  df_filtered = df_filtered[df_filtered['Год_ТС'].isin(sel_years)]
@@ -197,9 +197,9 @@ else:
         all_years = sorted(df_filtered['Год_ТС'].unique())
         
         with filter_col1:
-            sel_brands = st.multiselect("Марка прицепа:", all_brands)
+            sel_brands = st.multiselect("Марка прицепа:", all_brands, placeholder="Выбраны все (нажмите для фильтра)")
         with filter_col2:
-            sel_years = st.multiselect("Год выпуска:", all_years)
+            sel_years = st.multiselect("Год выпуска:", all_years, placeholder="Выбраны все (нажмите для фильтра)")
             
         if sel_brands: df_filtered = df_filtered[df_filtered['Марка'].isin(sel_brands)]
         if sel_years:  df_filtered = df_filtered[df_filtered['Год_ТС'].isin(sel_years)]
@@ -210,9 +210,9 @@ else:
         all_tr_brands = sorted(df_filtered['Марка_Прицепа'].unique())
         
         with filter_col1:
-            sel_t_brands = st.multiselect("Марка тягача (в составе сцепки):", all_t_brands)
+            sel_t_brands = st.multiselect("Марка тягача (в составе сцепки):", all_t_brands, placeholder="Выбраны все (нажмите для фильтра)")
         with filter_col2:
-            sel_tr_brands = st.multiselect("Марка прицепа (в составе сцепки):", all_tr_brands)
+            sel_tr_brands = st.multiselect("Марка прицепа (в составе сцепки):", all_tr_brands, placeholder="Выбраны все (нажмите для фильтра)")
             
         if sel_t_brands: df_filtered = df_filtered[df_filtered['Марка_Тягача'].isin(sel_t_brands)]
         if sel_tr_brands: df_filtered = df_filtered[df_filtered['Марка_Прицепа'].isin(sel_tr_brands)]
@@ -252,9 +252,10 @@ else:
         st.subheader("🔍 Детальный разбор")
         
         selected_cars = st.multiselect(
-            "Выберите конкретную технику из отфильтрованного списка:", 
+            "Выберите конкретную технику из списка (можно несколько):", 
             options=df_agg["Название_Отображение"].tolist(),
-            default=[df_agg["Название_Отображение"].iloc[0]] if not df_agg.empty else []
+            default=[df_agg["Название_Отображение"].iloc[0]] if not df_agg.empty else [],
+            placeholder="Выберите технику для анализа..."
         )
 
         if not selected_cars:
