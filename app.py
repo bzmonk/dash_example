@@ -33,15 +33,12 @@ FLEET_STRUCTURE = {
     "Колонна Перемещение": ["Назаров Андрей Михайлович"]
 }
 
-# Списки марок из скриншотов
 TRUCK_BRANDS = ["CHENGLONG", "DONGFENG", "FAW", "RENAULT T 4X2", "SCANIA", "SHACMAN", "SITRAK", "КАМАЗ"]
 TRAILER_BRANDS = ["BONUM", "CTTM CARGOLINE", "FLIEGL", "Grunwald", "ISO PAKCS", "KOLUMAN", "KRONE", "ORTHAUS", "SCHMITZ", "UAT", "WAGNERMAIER", "WIELTON", "Сторонний", "ТЗА", "ТОНАР"]
 
-# --- ГЕНЕРАЦИЯ ДАННЫХ (Акты ремонтов 2024-2026) ---
+# --- ГЕНЕРАЦИЯ ДАННЫХ ---
 @st.cache_data
 def get_data(mechanic_name):
-    # Привязываем генератор случайных чисел к имени, чтобы данные сохранялись при перезагрузке,
-    # но у разных механиков было РАЗНОЕ количество машин
     seed_val = hash(mechanic_name) % 2**32
     np.random.seed(seed_val)
     random.seed(seed_val)
@@ -50,7 +47,6 @@ def get_data(mechanic_name):
     prefixes = ["A", "B", "E", "K", "M", "H", "O", "P", "C", "T"]
     
     cars = []
-    # Рандомное количество машин от 5 до 25 (решает проблему с одинаковым кол-вом тягачей)
     fleet_size = random.randint(5, 25) 
     
     for _ in range(fleet_size):
@@ -70,12 +66,12 @@ def get_data(mechanic_name):
     end_date = datetime(2026, 12, 31)
     
     for car in cars:
-        # Генерируем ремонты для ТЯГАЧА
+        # Ремонты ТЯГАЧА
         for _ in range(random.randint(10, 30)):
             r_date = start_date + timedelta(days=random.randint(0, (end_date - start_date).days))
             brakes = random.randint(0, 50000) if random.random() > 0.4 else 0
             suspension = random.randint(0, 40000) if random.random() > 0.5 else 0
-            engine = random.randint(0, 150000) if random.random() > 0.8 else 0 # ДВС только у тягача
+            engine = random.randint(0, 150000) if random.random() > 0.8 else 0
             electric = random.randint(0, 20000) if random.random() > 0.6 else 0
             other = random.randint(5000, 20000)
             total = brakes + suspension + engine + electric + other
@@ -83,17 +79,18 @@ def get_data(mechanic_name):
             
             events.append({
                 "Сцепка": car['combo'], "Госномер": car['truck'], "Марка": car['t_brand'], "Год_ТС": car['t_year'],
+                "Марка_Тягача": car['t_brand'], "Марка_Прицепа": car['tr_brand'], # Добавлено для удобного фильтра сцепки
                 "Тип": "Тягач", "Дата": r_date, "Год": r_date.year, "Месяц": r_date.month,
                 "Тормоза": brakes, "Ходовая": suspension, "ДВС": engine, "Электрика": electric, "Прочее": other,
                 "Итого": total, "Пробег_период": mileage
             })
             
-        # Генерируем ремонты для ПРИЦЕПА
+        # Ремонты ПРИЦЕПА
         for _ in range(random.randint(5, 20)):
             r_date = start_date + timedelta(days=random.randint(0, (end_date - start_date).days))
             brakes = random.randint(0, 60000) if random.random() > 0.3 else 0
             suspension = random.randint(0, 50000) if random.random() > 0.4 else 0
-            engine = 0 # У прицепа нет ДВС
+            engine = 0
             electric = random.randint(0, 10000) if random.random() > 0.7 else 0
             other = random.randint(2000, 15000)
             total = brakes + suspension + engine + electric + other
@@ -101,6 +98,7 @@ def get_data(mechanic_name):
             
             events.append({
                 "Сцепка": car['combo'], "Госномер": car['trailer'], "Марка": car['tr_brand'], "Год_ТС": car['tr_year'],
+                "Марка_Тягача": car['t_brand'], "Марка_Прицепа": car['tr_brand'],
                 "Тип": "Прицеп", "Дата": r_date, "Год": r_date.year, "Месяц": r_date.month,
                 "Тормоза": brakes, "Ходовая": suspension, "ДВС": engine, "Электрика": electric, "Прочее": other,
                 "Итого": total, "Пробег_период": mileage
@@ -157,12 +155,12 @@ else:
 
     df_raw = get_data(st.session_state.mech)
     
-    # --- НОВЫЙ БЛОК: ВЫБОР КАТЕГОРИИ И ПЕРИОДА ---
     st.markdown("### 🎛️ Фильтры аналитики")
     
-    # Выбор сущности для анализа
+    # 1. Выбор категории
     view_mode = st.radio("Выберите объект анализа:", ["Сцепка", "Тягач", "Прицеп"], horizontal=True)
     
+    # 2. Фильтры периода
     f_col1, f_col2 = st.columns([1, 3])
     with f_col1:
         selected_year = st.selectbox("Выберите год:", [2024, 2025, 2026], index=0)
@@ -172,21 +170,56 @@ else:
     start_m_idx = REV_MONTHS[start_m]
     end_m_idx = REV_MONTHS[end_m]
 
-    # Фильтрация по дате
+    # Базовая фильтрация по дате
     df_filtered = df_raw[(df_raw['Год'] == selected_year) & (df_raw['Месяц'] >= start_m_idx) & (df_raw['Месяц'] <= end_m_idx)]
     
-    # Фильтрация по категории (Тягач/Прицеп/Сцепка)
+    # 3. Фильтры Марки и Года (зависят от выбранной категории)
+    st.markdown("#### 🏷️ Характеристики техники (оставьте пустым для выбора всех)")
+    filter_col1, filter_col2 = st.columns(2)
+    
     if view_mode == "Тягач":
         df_filtered = df_filtered[df_filtered['Тип'] == "Тягач"]
+        all_brands = sorted(df_filtered['Марка'].unique())
+        all_years = sorted(df_filtered['Год_ТС'].unique())
+        
+        with filter_col1:
+            sel_brands = st.multiselect("Марка тягача:", all_brands)
+        with filter_col2:
+            sel_years = st.multiselect("Год выпуска:", all_years)
+            
+        if sel_brands: df_filtered = df_filtered[df_filtered['Марка'].isin(sel_brands)]
+        if sel_years:  df_filtered = df_filtered[df_filtered['Год_ТС'].isin(sel_years)]
         group_cols = ["Госномер", "Марка", "Год_ТС"]
+
     elif view_mode == "Прицеп":
         df_filtered = df_filtered[df_filtered['Тип'] == "Прицеп"]
+        all_brands = sorted(df_filtered['Марка'].unique())
+        all_years = sorted(df_filtered['Год_ТС'].unique())
+        
+        with filter_col1:
+            sel_brands = st.multiselect("Марка прицепа:", all_brands)
+        with filter_col2:
+            sel_years = st.multiselect("Год выпуска:", all_years)
+            
+        if sel_brands: df_filtered = df_filtered[df_filtered['Марка'].isin(sel_brands)]
+        if sel_years:  df_filtered = df_filtered[df_filtered['Год_ТС'].isin(sel_years)]
         group_cols = ["Госномер", "Марка", "Год_ТС"]
+
     else: # Сцепка
+        all_t_brands = sorted(df_filtered['Марка_Тягача'].unique())
+        all_tr_brands = sorted(df_filtered['Марка_Прицепа'].unique())
+        
+        with filter_col1:
+            sel_t_brands = st.multiselect("Марка тягача (в составе сцепки):", all_t_brands)
+        with filter_col2:
+            sel_tr_brands = st.multiselect("Марка прицепа (в составе сцепки):", all_tr_brands)
+            
+        if sel_t_brands: df_filtered = df_filtered[df_filtered['Марка_Тягача'].isin(sel_t_brands)]
+        if sel_tr_brands: df_filtered = df_filtered[df_filtered['Марка_Прицепа'].isin(sel_tr_brands)]
         group_cols = ["Сцепка"]
     
     if df_filtered.empty:
-        st.warning(f"В выбранном периоде нет записей о ремонтах для категории: {view_mode}.")
+        st.warning(f"Нет данных по выбранным фильтрам для категории: {view_mode}.")
     else:
         # Агрегация данных
         df_agg = df_filtered.groupby(group_cols).agg({
@@ -194,7 +227,7 @@ else:
             "Ходовая": "sum", "ДВС": "sum", "Электрика": "sum", "Прочее": "sum"
         }).reset_index()
         
-        # Формирование красивого названия (с маркой и годом, если не сцепка)
+        # Формирование названия
         if view_mode != "Сцепка":
             df_agg["Название_Отображение"] = df_agg["Госномер"] + " (" + df_agg["Марка"] + ", " + df_agg["Год_ТС"].astype(str) + " г.)"
         else:
@@ -209,31 +242,31 @@ else:
         k3.metric("Средний Руб/Км", f"{df_agg['Руб/Км'].mean():.2f}")
 
         st.markdown("---")
-        st.subheader(f"⚠️ Топ-10 затрат ({view_mode}) за {start_m}-{end_m} {selected_year}")
+        st.subheader(f"⚠️ Топ-10 затрат ({view_mode})")
         fig = px.bar(df_agg.head(10), x="Название_Отображение", y="Руб/Км", color="Руб/Км", color_continuous_scale="Reds", text="Итого")
         fig.update_traces(texttemplate='%{text:,.0f} ₽', textposition='outside')
         fig.update_layout(xaxis_title="Техника", yaxis_title="Руб / Км")
         st.plotly_chart(fig, use_container_width=True)
 
         st.markdown("---")
-        st.subheader("🔍 Выбор техники для детального разбора")
+        st.subheader("🔍 Детальный разбор")
         
         selected_cars = st.multiselect(
-            "Выберите единицы техники для анализа:", 
+            "Выберите конкретную технику из отфильтрованного списка:", 
             options=df_agg["Название_Отображение"].tolist(),
             default=[df_agg["Название_Отображение"].iloc[0]] if not df_agg.empty else []
         )
 
         if not selected_cars:
-            st.info("Пожалуйста, выберите технику из списка выше.")
+            st.info("Пожалуйста, выберите технику.")
         else:
             group_data = df_agg[df_agg["Название_Отображение"].isin(selected_cars)]
             
-            # --- БЛОК 1: СВОДКА ПО ГРУППЕ ---
+            # --- СВОДКА ПО ГРУППЕ ---
             st.markdown("### 📊 Сводка по выбранной группе")
             total_group_cost = group_data["Итого"].sum()
             total_group_mileage = group_data["Пробег_период"].sum()
-            group_cpk = round(total_group_cost / total_group_mileage, 2)
+            group_cpk = round(total_group_cost / total_group_mileage, 2) if total_group_mileage > 0 else 0
             
             g_col1, g_col2 = st.columns([1, 1])
             with g_col1:
@@ -243,15 +276,14 @@ else:
                 st.info(f"**Средний показатель группы:** `{group_cpk} руб/км`")
             with g_col2:
                 costs_group = { "Тормоза": group_data["Тормоза"].sum(), "Ходовая": group_data["Ходовая"].sum(), "ДВС": group_data["ДВС"].sum(), "Электрика": group_data["Электрика"].sum(), "Прочее": group_data["Прочее"].sum()}
-                # Убираем нулевые значения (например ДВС для прицепов) чтобы график был красивее
                 costs_group = {k: v for k, v in costs_group.items() if v > 0} 
                 fig_pie_group = px.pie(values=list(costs_group.values()), names=list(costs_group.keys()), hole=0.4, title="Распределение затрат группы")
                 fig_pie_group.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", height=300, margin=dict(t=30, b=0, l=0, r=0)) 
                 st.plotly_chart(fig_pie_group, use_container_width=True)
 
-            # --- БЛОК 2: ИНДИВИДУАЛЬНЫЕ КАРТОЧКИ ---
+            # --- ИНДИВИДУАЛЬНЫЕ КАРТОЧКИ ---
             st.markdown("---")
-            st.markdown(f"### ⚙️ Индивидуальный разбор ({view_mode})")
+            st.markdown(f"### ⚙️ Карточки техники ({view_mode})")
             
             for car_name in selected_cars:
                 car_row = group_data[group_data["Название_Отображение"] == car_name].iloc[0]
@@ -266,7 +298,7 @@ else:
                         st.write(f"**Показатель:** `{car_row['Руб/Км']} руб/км`")
                         
                         if car_row['Руб/Км'] > 3.0:
-                            st.error("**Аномальный расход!** Затраты значительно превышают норму. Рекомендуется технический аудит.")
+                            st.error("**Аномальный расход!** Затраты значительно превышают норму.")
                         elif car_row['Тормоза'] > car_row['Итого'] * 0.45:
                             st.warning("**Проблема с тормозами.** Более 45% затрат уходит на этот узел.")
                         elif car_row['ДВС'] > car_row['Итого'] * 0.5:
