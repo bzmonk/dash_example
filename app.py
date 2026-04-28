@@ -9,17 +9,42 @@ import os
 # --- НАСТРОЙКИ СТРАНИЦЫ ---
 st.set_page_config(page_title="AI Аналитика Ремонтов", layout="wide", initial_sidebar_state="collapsed")
 
-# --- СТИЛИЗАЦИЯ И ФИКС ЛОГОТИПА ---
+# --- СТИЛИЗАЦИЯ (АДАПТИВНАЯ ПОД ТЕМНУЮ/СВЕТЛУЮ ТЕМУ) ---
 st.markdown("""
     <style>
     img { object-fit: contain !important; }
-    div[data-testid="stExpander"] { background-color: #ffffff !important; border-radius: 15px !important; border: 1px solid #3b82f6 !important; margin-bottom: 10px; }
-    div[data-testid="stExpander"] p, div[data-testid="stExpander"] span { color: #003366 !important; font-weight: bold !important; font-size: 1.1rem; }
-    .stButton>button { border-radius: 12px; background-color: #3b82f6 !important; color: white !important; border: none; padding: 10px 20px; transition: all 0.3s; }
-    .stButton>button:hover { background-color: #1d4ed8 !important; transform: translateY(-2px); }
+    
+    /* Исправленные Expanders (Колонны) - теперь без белого фона, адаптируются под тему */
+    div[data-testid="stExpander"] { 
+        background-color: transparent !important; 
+        border-radius: 10px !important; 
+        border: 1px solid #3b82f6 !important; 
+        margin-bottom: 10px; 
+    }
+    div[data-testid="stExpander"] p, div[data-testid="stExpander"] span { 
+        font-weight: bold !important; 
+        font-size: 1.1rem; 
+    }
+    
+    /* Стилизация кнопок */
+    .stButton>button { 
+        border-radius: 8px; 
+        background-color: #3b82f6 !important; 
+        color: white !important; 
+        border: none; 
+        padding: 10px 20px; 
+        transition: all 0.3s; 
+    }
+    .stButton>button:hover { 
+        background-color: #1d4ed8 !important; 
+        transform: translateY(-2px); 
+    }
+    
+    /* Цвет заголовков */
     h1, h2, h3, h4 { color: #3b82f6 !important; }
+    
+    /* Цвет ползунка */
     .stSlider div[data-testid="stThumbValue"] { color: #3b82f6 !important; }
-    .car-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px; background-color: #f9fafb; margin-bottom: 20px;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -132,7 +157,7 @@ if st.session_state.page == 'main':
         for col_name, mechanics in FLEET_STRUCTURE.items():
             with st.expander(f"📁 {col_name}"):
                 for m in mechanics:
-                    if st.button(f"👤 {m}", key=f"btn_{col_name}_{m}"):
+                    if st.button(f"👤 {m}", key=f"btn_{col_name}_{m}", use_container_width=True):
                         st.session_state.mech = m
                         st.session_state.col = col_name
                         st.session_state.page = 'dashboard'
@@ -157,10 +182,8 @@ else:
     
     st.markdown("### 🎛️ Фильтры аналитики")
     
-    # 1. Выбор категории
     view_mode = st.radio("Выберите объект анализа:", ["Сцепка", "Тягач", "Прицеп"], horizontal=True)
     
-    # 2. Фильтры периода
     f_col1, f_col2 = st.columns([1, 3])
     with f_col1:
         selected_year = st.selectbox("Выберите год:", [2024, 2025, 2026], index=0)
@@ -170,10 +193,8 @@ else:
     start_m_idx = REV_MONTHS[start_m]
     end_m_idx = REV_MONTHS[end_m]
 
-    # Базовая фильтрация по дате
     df_filtered = df_raw[(df_raw['Год'] == selected_year) & (df_raw['Месяц'] >= start_m_idx) & (df_raw['Месяц'] <= end_m_idx)]
     
-    # 3. Фильтры Марки и Года (зависят от выбранной категории)
     st.markdown("#### 🏷️ Характеристики техники")
     filter_col1, filter_col2 = st.columns(2)
     
@@ -183,9 +204,9 @@ else:
         all_years = sorted(df_filtered['Год_ТС'].unique())
         
         with filter_col1:
-            sel_brands = st.multiselect("Марка тягача:", all_brands, placeholder="Выбраны все (нажмите для фильтра)")
+            sel_brands = st.multiselect("Марка тягача:", all_brands, placeholder="Выбраны все (оставьте пустым для поиска по всем)")
         with filter_col2:
-            sel_years = st.multiselect("Год выпуска:", all_years, placeholder="Выбраны все (нажмите для фильтра)")
+            sel_years = st.multiselect("Год выпуска:", all_years, placeholder="Выбраны все (оставьте пустым для поиска по всем)")
             
         if sel_brands: df_filtered = df_filtered[df_filtered['Марка'].isin(sel_brands)]
         if sel_years:  df_filtered = df_filtered[df_filtered['Год_ТС'].isin(sel_years)]
@@ -197,9 +218,9 @@ else:
         all_years = sorted(df_filtered['Год_ТС'].unique())
         
         with filter_col1:
-            sel_brands = st.multiselect("Марка прицепа:", all_brands, placeholder="Выбраны все (нажмите для фильтра)")
+            sel_brands = st.multiselect("Марка прицепа:", all_brands, placeholder="Выбраны все (оставьте пустым для поиска по всем)")
         with filter_col2:
-            sel_years = st.multiselect("Год выпуска:", all_years, placeholder="Выбраны все (нажмите для фильтра)")
+            sel_years = st.multiselect("Год выпуска:", all_years, placeholder="Выбраны все (оставьте пустым для поиска по всем)")
             
         if sel_brands: df_filtered = df_filtered[df_filtered['Марка'].isin(sel_brands)]
         if sel_years:  df_filtered = df_filtered[df_filtered['Год_ТС'].isin(sel_years)]
@@ -210,9 +231,9 @@ else:
         all_tr_brands = sorted(df_filtered['Марка_Прицепа'].unique())
         
         with filter_col1:
-            sel_t_brands = st.multiselect("Марка тягача (в составе сцепки):", all_t_brands, placeholder="Выбраны все (нажмите для фильтра)")
+            sel_t_brands = st.multiselect("Марка тягача (в составе сцепки):", all_t_brands, placeholder="Выбраны все (оставьте пустым для поиска по всем)")
         with filter_col2:
-            sel_tr_brands = st.multiselect("Марка прицепа (в составе сцепки):", all_tr_brands, placeholder="Выбраны все (нажмите для фильтра)")
+            sel_tr_brands = st.multiselect("Марка прицепа (в составе сцепки):", all_tr_brands, placeholder="Выбраны все (оставьте пустым для поиска по всем)")
             
         if sel_t_brands: df_filtered = df_filtered[df_filtered['Марка_Тягача'].isin(sel_t_brands)]
         if sel_tr_brands: df_filtered = df_filtered[df_filtered['Марка_Прицепа'].isin(sel_tr_brands)]
@@ -221,13 +242,11 @@ else:
     if df_filtered.empty:
         st.warning(f"Нет данных по выбранным фильтрам для категории: {view_mode}.")
     else:
-        # Агрегация данных
         df_agg = df_filtered.groupby(group_cols).agg({
             "Итого": "sum", "Пробег_период": "sum", "Тормоза": "sum", 
             "Ходовая": "sum", "ДВС": "sum", "Электрика": "sum", "Прочее": "sum"
         }).reset_index()
         
-        # Формирование названия
         if view_mode != "Сцепка":
             df_agg["Название_Отображение"] = df_agg["Госномер"] + " (" + df_agg["Марка"] + ", " + df_agg["Год_ТС"].astype(str) + " г.)"
         else:
@@ -245,14 +264,14 @@ else:
         st.subheader(f"⚠️ Топ-10 затрат ({view_mode})")
         fig = px.bar(df_agg.head(10), x="Название_Отображение", y="Руб/Км", color="Руб/Км", color_continuous_scale="Reds", text="Итого")
         fig.update_traces(texttemplate='%{text:,.0f} ₽', textposition='outside')
-        fig.update_layout(xaxis_title="Техника", yaxis_title="Руб / Км")
+        fig.update_layout(xaxis_title="Техника", yaxis_title="Руб / Км", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
         st.plotly_chart(fig, use_container_width=True)
 
         st.markdown("---")
         st.subheader("🔍 Детальный разбор")
         
         selected_cars = st.multiselect(
-            "Выберите конкретную технику из списка (можно несколько):", 
+            "Выберите конкретную технику из списка:", 
             options=df_agg["Название_Отображение"].tolist(),
             default=[df_agg["Название_Отображение"].iloc[0]] if not df_agg.empty else [],
             placeholder="Выберите технику для анализа..."
@@ -263,7 +282,6 @@ else:
         else:
             group_data = df_agg[df_agg["Название_Отображение"].isin(selected_cars)]
             
-            # --- СВОДКА ПО ГРУППЕ ---
             st.markdown("### 📊 Сводка по выбранной группе")
             total_group_cost = group_data["Итого"].sum()
             total_group_mileage = group_data["Пробег_период"].sum()
@@ -282,7 +300,6 @@ else:
                 fig_pie_group.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", height=300, margin=dict(t=30, b=0, l=0, r=0)) 
                 st.plotly_chart(fig_pie_group, use_container_width=True)
 
-            # --- ИНДИВИДУАЛЬНЫЕ КАРТОЧКИ ---
             st.markdown("---")
             st.markdown(f"### ⚙️ Карточки техники ({view_mode})")
             
